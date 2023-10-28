@@ -1,14 +1,20 @@
-from tkinter import Tk, Button, Entry, Label
-import cv2
-import numpy as np
-import time
-import psycopg2
-from dotenv import load_dotenv
-from dotenv import find_dotenv
 import os
 
+import ast
+
+from tkinter import Tk, Button, Entry, Label
+
+import cv2
+import numpy as np
+
+import psycopg2
+from psycopg2 import sql
+
+from dotenv import load_dotenv
+
+
 # Загрузка переменных окружения
-load_dotenv(find_dotenv())
+load_dotenv()
 
 global db_name
 global user
@@ -17,24 +23,35 @@ DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('USER')
 DB_PASSWORD = os.getenv('PASSWORD')
 
+RADIUS = 5
+LENGTH = 180
+
 # Класс для работы с бд
 class DBActions:
+    
     def __init__(self, db_name, user, password, host='localhost'):
         self.__db_name = db_name
         self.__user = user
         self.__password = password
         self.__host = host
+        #print(db_name)
+        #print(password)
+        print(db_name)
+        print(DB_NAME)
+        
         self.__conn = psycopg2.connect(
-            dbname=db_name,
-            user=user,
-            password=password,
-            host=host,
+            dbname=self.__db_name,
+            user=self.__user,
+            password=self.__password,
+            host=self.__host,
         )
-        self.__cursor = self.__conn.cursor()
+        self._cursor = self.__conn.cursor()
+        self._cursor.execute('SELECT current_database()')
+        print(self._cursor.fetchall())
     
     def create_notion(self, name, data):
-        self.__cursor.execute(
-            'INSERT INTO schemes (name, data) '
+        self._cursor.execute(
+            'INSERT INTO schemes (name, objects) '
             f'VALUES (%(name)s, %(data)s)',
             {
                 'name': name,
@@ -44,12 +61,14 @@ class DBActions:
         self.__conn.commit()
         self.__conn.close()
     
-    def get_notion(self):
-        self.__cursor.execute('SELECT * FROM schemes')
+    def get_notion(self, table='schemes'):
+        self._cursor.execute(f'SELECT name, objects FROM "{table}";')
+        #self.__cursor.execute(sql.SQL('SELECT * FROM {}').format(sql.Identifier(table)))
+        return self._cursor.fetchall()
+
 
 # Функция создания макета
 def create_layout():
-
     # Создание пустого холста
     canvas = np.zeros((480, 640, 3), dtype=np.uint8)
 
@@ -64,9 +83,6 @@ def create_layout():
     global is_clicked
     is_clicked = False
 
-    RADIUS = 10
-
-
     def mark_exhibit(event, x, y, flags, param):
         """
         Нажатие кнопки 'v' на клавиатуре.
@@ -78,8 +94,9 @@ def create_layout():
             cv2.rectangle(canvas, (x-10, y-10), (x+10, y+10), (0, 255, 0), -1)
 
             exhibits = project.get('exhibits')
-            exhibits.append(((x-10, y-10), (x+10, y+10), (0, 255, 0), -1))
-     
+            exhibits.append((x, y, (0, 255, 0), -1))
+            #print(exhibits)
+
     def mark_camera(event, x, y, flags, param):
         """
         Нажатие кнопки 'с' на клавиатуре.
@@ -96,6 +113,7 @@ def create_layout():
             global center_y
             center_x = x
             center_y = y
+            #print(f'camera {x} {y}')
 
             is_clicked = True
             return
@@ -108,18 +126,18 @@ def create_layout():
             is_clicked = False
             return
 
-
     def draw_triangle(angle, center_x, center_y):
         """Отрисовка поля зрения камеры"""
 
         # Вычисление координат вершин треугольника
+        #print(f'draw {center_x} {center_y}')
         length = 180
 
         # Определение двух других вершин
-        vertex2_x = center_x + int(length * np.cos(np.radians(angle + 300)))
-        vertex2_y = center_y + int(length * np.sin(np.radians(angle + 300)))
-        vertex3_x = center_x + int(length * np.cos(np.radians(angle + 60)))
-        vertex3_y = center_y + int(length * np.sin(np.radians(angle + 60)))
+        vertex2_x = center_x + int(LENGTH * np.cos(np.radians(angle + 300)))
+        vertex2_y = center_y + int(LENGTH * np.sin(np.radians(angle + 300)))
+        vertex3_x = center_x + int(LENGTH * np.cos(np.radians(angle + 60)))
+        vertex3_y = center_y + int(LENGTH * np.sin(np.radians(angle + 60)))
 
         # Отрисовка треугольника на холсте
         cv2.line(canvas, (center_x, center_y), (vertex2_x, vertex2_y), (255, 0, 0), 2)
@@ -136,6 +154,7 @@ def create_layout():
              vertex3_x,
              vertex3_y)
         )
+        #print(cameras)
     
     def save_scheme_window():
         """
@@ -143,32 +162,42 @@ def create_layout():
         Сохраняем проект
         """
 
+        #print(project)
+
         # Создаем окно
-        root = Tk()
+        global root_save_scheme
+        root_save_scheme = Tk()
 
         # Создаем текстовое поле
-        label = Label(root, text='Enter name of canvas', width=30)
+        label = Label(root_save_scheme, text='Enter name of canvas', width=30)
         label.pack()
 
         # Поле ввода названия
         global entry_name
-        entry_name = Entry(root, width=30)
+        entry_name = Entry(root_save_scheme, width=30)
         entry_name.pack()
 
         # Кнопка сохранения проекта
-        button = Button(root, text='Save', command=save_scheme_to_db)
+        button = Button(root_save_scheme, text='Save', command=save_scheme_to_db)
         button.pack()
-        root.mainloop()
-    
+
+        root_save_scheme.mainloop()
+
     def save_scheme_to_db():
         """
-        Создаем новую запись в таблице для схем
+        Создает новую запись в таблице для схем
         """
+        
+        #print(entry_name.get())
 
         # Создание записи в бд
         name = entry_name.get()
         db = DBActions(DB_NAME, DB_USER, DB_PASSWORD)
         db.create_notion(name, project)
+
+        # Закрытие окон редактирования
+        root_save_scheme.destroy()
+        cv2.destroyWindow('Create canvas')
 
     # Создание окна с холстом
     cv2.namedWindow('Create canvas')
@@ -202,21 +231,73 @@ def create_layout():
 
 # Функция получения списка
 def get_layouts():
-    db = DBActions(DB_USER, DB_USER, DB_PASSWORD)
+    #def draw_objects(objects):
+
+    def show_layout(objects):
+        objects = ast.literal_eval(objects)
+        canvas = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.namedWindow('Show  layout')
+
+        while True:
+            cv2.imshow('Show layout', canvas)
+            for camera in objects.get('cameras'):
+                cv2.circle(canvas, (camera[0], camera[1]), RADIUS, (0, 0, 255), -1)
+
+                cv2.line(canvas, (camera[0], camera[1]), (camera[2], camera[3]), (255, 0, 0), 2)
+                cv2.line(canvas, (camera[0], camera[1]), (camera[4], camera[5]), (255, 0, 0), 2)
+                cv2.line(canvas, (camera[4], camera[5]), (camera[2], camera[3]), (255, 0, 0), 2)
+            
+            for exhibitions in objects.get('exhibits'):
+                ...
+            
+            if cv2.getWindowProperty('Create canvas', cv2.WND_PROP_VISIBLE) <1:
+                break
+        
+        cv2.destroyAllWindows()
+
+
+
+    def create_button(window, text, objects):
+        btn = Button(window, text=text, command=lambda: show_layout(objects))
+        return btn
+
+    root_get_layouts = Tk()
+    root_get_layouts.geometry('400x250')
+    root_get_layouts.title('Список схем')
+
+    db = DBActions(DB_NAME, DB_USER, DB_PASSWORD)
+    #print(db.get_notion())
+    print(db.get_notion())
+    #print(db._cursor.fetchall())
+    n_column = 1
+    n_row = 1
+    for notion in db.get_notion():
+        name, objects = notion
+        create_button(root_get_layouts, name, objects).grid(column=n_column, row=n_row)
+        n_row += 1
+
+    
+    #create_button(root_get_layouts, 'da')#.grid(column=1, row=1)
+    
+
+
+# Функция для просмотра статистики
+def check_statistics():
+    ...
 
 def main():
-    # Создание окна
-    window = Tk()
-    window.geometry('400x250')
-    window.title('Система распознавания поведения и эмоций')
+    # Создание основного окна
+    main_window = Tk()
+    main_window.geometry('400x250')
+    main_window.title('Система распознавания поведения и эмоций')
 
-    btn_create = Button(window, text='Создание макета музея', command=create_layout)
+    btn_create = Button(main_window, text='Создание макета музея', command=create_layout)
     btn_create.place(height=50, width=150, x=15, y=75)
 
-    btn_check = Button(window, text='Просмотр макетов', command=get_layouts)
+    btn_check = Button(main_window, text='Просмотр макетов', command=get_layouts)
     btn_check.place(height=50, width=150, x=235, y=75)
 
-    window.mainloop()
+    main_window.mainloop()
 
 if __name__ == '__main__':
     main()
