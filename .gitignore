@@ -6,8 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
-# Distribution / packaging
+# local files and folders
 patterns/
+photo-of-markers/
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/

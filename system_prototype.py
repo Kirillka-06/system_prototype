@@ -8,7 +8,6 @@ import cv2
 import numpy as np
 
 import psycopg2
-from psycopg2 import sql
 
 from dotenv import load_dotenv
 
@@ -16,6 +15,7 @@ from dotenv import load_dotenv
 # Загрузка переменных окружения
 load_dotenv()
 
+# Получение переменных окружения
 global db_name
 global user
 global password
@@ -23,21 +23,19 @@ DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('USER')
 DB_PASSWORD = os.getenv('PASSWORD')
 
+# дефолт данные для объектов макета
 RADIUS = 5
 LENGTH = 180
 
+
 # Класс для работы с бд
 class DBActions:
-    
+
     def __init__(self, db_name, user, password, host='localhost'):
         self.__db_name = db_name
         self.__user = user
         self.__password = password
         self.__host = host
-        #print(db_name)
-        #print(password)
-        print(db_name)
-        print(DB_NAME)
         
         self.__conn = psycopg2.connect(
             dbname=self.__db_name,
@@ -63,7 +61,6 @@ class DBActions:
     
     def get_notion(self, table='schemes'):
         self._cursor.execute(f'SELECT name, objects FROM "{table}";')
-        #self.__cursor.execute(sql.SQL('SELECT * FROM {}').format(sql.Identifier(table)))
         return self._cursor.fetchall()
 
 
@@ -95,7 +92,6 @@ def create_layout():
 
             exhibits = project.get('exhibits')
             exhibits.append((x, y, (0, 255, 0), -1))
-            #print(exhibits)
 
     def mark_camera(event, x, y, flags, param):
         """
@@ -113,7 +109,6 @@ def create_layout():
             global center_y
             center_x = x
             center_y = y
-            #print(f'camera {x} {y}')
 
             is_clicked = True
             return
@@ -128,10 +123,6 @@ def create_layout():
 
     def draw_triangle(angle, center_x, center_y):
         """Отрисовка поля зрения камеры"""
-
-        # Вычисление координат вершин треугольника
-        #print(f'draw {center_x} {center_y}')
-        length = 180
 
         # Определение двух других вершин
         vertex2_x = center_x + int(LENGTH * np.cos(np.radians(angle + 300)))
@@ -154,15 +145,12 @@ def create_layout():
              vertex3_x,
              vertex3_y)
         )
-        #print(cameras)
     
     def save_scheme_window():
         """
         Нажатие кнопки 's' на клавиатуре.
         Сохраняем проект
         """
-
-        #print(project)
 
         # Создаем окно
         global root_save_scheme
@@ -187,8 +175,6 @@ def create_layout():
         """
         Создает новую запись в таблице для схем
         """
-        
-        #print(entry_name.get())
 
         # Создание записи в бд
         name = entry_name.get()
@@ -223,7 +209,7 @@ def create_layout():
         if cv2.waitKey(1) & 0xFF == ord('s'):
             save_scheme_window()
 
-        if cv2.getWindowProperty('Create canvas', cv2.WND_PROP_VISIBLE) <1:
+        if cv2.getWindowProperty('Create canvas', cv2.WND_PROP_VISIBLE) < 1:
             break
 
     # Закрытие окна
@@ -236,24 +222,25 @@ def get_layouts():
     def show_layout(objects):
         objects = ast.literal_eval(objects)
         canvas = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.namedWindow('Show  layout')
+        #cv2.namedWindow('Show  layout')
 
         while True:
-            cv2.imshow('Show layout', canvas)
             for camera in objects.get('cameras'):
                 cv2.circle(canvas, (camera[0], camera[1]), RADIUS, (0, 0, 255), -1)
 
                 cv2.line(canvas, (camera[0], camera[1]), (camera[2], camera[3]), (255, 0, 0), 2)
                 cv2.line(canvas, (camera[0], camera[1]), (camera[4], camera[5]), (255, 0, 0), 2)
                 cv2.line(canvas, (camera[4], camera[5]), (camera[2], camera[3]), (255, 0, 0), 2)
-            
+
             for exhibitions in objects.get('exhibits'):
                 ...
             
-            if cv2.getWindowProperty('Create canvas', cv2.WND_PROP_VISIBLE) <1:
-                break
-        
-        cv2.destroyAllWindows()
+            #cv2.imshow('Show layout', canvas)
+
+            #if cv2.getWindowProperty('Create canvas', cv2.WND_PROP_VISIBLE) < 1:
+                #break
+
+        #cv2.destroyAllWindows()
 
 
 
@@ -266,20 +253,13 @@ def get_layouts():
     root_get_layouts.title('Список схем')
 
     db = DBActions(DB_NAME, DB_USER, DB_PASSWORD)
-    #print(db.get_notion())
-    print(db.get_notion())
-    #print(db._cursor.fetchall())
+
     n_column = 1
     n_row = 1
     for notion in db.get_notion():
         name, objects = notion
         create_button(root_get_layouts, name, objects).grid(column=n_column, row=n_row)
         n_row += 1
-
-    
-    #create_button(root_get_layouts, 'da')#.grid(column=1, row=1)
-    
-
 
 # Функция для просмотра статистики
 def check_statistics():
@@ -291,12 +271,14 @@ def main():
     main_window.geometry('400x250')
     main_window.title('Система распознавания поведения и эмоций')
 
+    # Кнопки основного функционала программы
     btn_create = Button(main_window, text='Создание макета музея', command=create_layout)
     btn_create.place(height=50, width=150, x=15, y=75)
 
     btn_check = Button(main_window, text='Просмотр макетов', command=get_layouts)
     btn_check.place(height=50, width=150, x=235, y=75)
 
+    # Функция, чтобы окно не закрывалось
     main_window.mainloop()
 
 if __name__ == '__main__':
