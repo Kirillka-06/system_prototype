@@ -27,16 +27,18 @@ ARUCO_DICT = {
     'DICT_ARUCO_ORIGINAL': aruco.DICT_ARUCO_ORIGINAL
 }
 ARUCO_CHOICES = list(ARUCO_DICT.keys())
-
 byte_image = None
 
 def generate_aruco_marker(dict, id):
     try:
+        # Получаем предустановленный словарь аруко маркеров
         dictionary = aruco.getPredefinedDictionary(ARUCO_DICT[dict])
         # Сгенерировать изображение аруко маркера
         aruco_marker_image = aruco.generateImageMarker(dictionary, int(id), 200, borderBits=1)
 
+        # Кодируем массив картинки в формат .png
         img_imcode = cv2.imencode('.png', aruco_marker_image)
+        # Превращаем массив картинки в байт-строчку и сохраняем её глобально
         global img
         img = img_imcode[1].tobytes()
         return img
@@ -46,8 +48,10 @@ def generate_aruco_marker(dict, id):
         tk_mb.showerror(title='Ошибка', message='Поле ID обязательно к заполнению')
 
 def show_aruco_marker(window: tk.Misc, dict, id):
+    # Получаем сгенерированный аруко маркер в байтах
     generated_aruco_image = generate_aruco_marker(dict, id)
 
+    # 
     opened_aruco_image = Image.open(io.BytesIO(generated_aruco_image))
     image_label = tk.Label(window, name='image_label')
     aruco_image = ImageTk.PhotoImage(opened_aruco_image)
@@ -58,14 +62,16 @@ def show_aruco_marker(window: tk.Misc, dict, id):
     canvas.create_image((15, 15), state = "normal", image=aruco_image, anchor=NW)
     canvas.place(x=187.5, y=250)
 
-def save_aruco_marker(window: tk.Misc):
-    filepath = tk_fd.asksaveasfilename(defaultextension='png', initialfile='aruco-marker.png')
-    if filepath != '':
-        aruco_image = Image.open(io.BytesIO(img))
-        aruco_image.save(filepath)
-        return
-    tk_mb.showerror(title='Ошибка', message='Выберите ArUco маркер')
-
+def save_aruco_marker():
+    try:
+        filepath = tk_fd.asksaveasfilename(defaultextension='png', initialfile='aruco-marker.png')
+        if filepath != '':
+            aruco_image = Image.open(io.BytesIO(img))
+            aruco_image.save(filepath)
+            return
+        raise NameError('Выбор ArUco маркера обязателен')
+    except NameError:
+        tk_mb.showerror(title='Ошибка', message='Выберите ArUco маркер')
 
 def define_aruco(window: tk.Misc):
     aruco_dictionary_label = tk.Label(
@@ -109,7 +115,7 @@ def define_aruco(window: tk.Misc):
         window,
         name='button_save_aruco',
         text='Save ArUco marker',
-        command=lambda: save_aruco_marker(window)
+        command=save_aruco_marker
     )
     button_save_aruco.place(height=50, width=150, x=225, y=515)
 

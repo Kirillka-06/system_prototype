@@ -4,7 +4,7 @@ import argparse
 
 
 # Подключаемся к камере
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 while True:
     # Получаем видео изображение с камеры
@@ -19,6 +19,7 @@ while True:
     # Обнаруживаем аруко маркеры
     corners, ids, rejected = cv2.aruco.detectMarkers(
         frame, arucoDict, parameters=arucoParams)
+    print(corners)
 
     # Проверяем, что хотя бы один аруко маркер был обнаружен
     if len(corners) > 0:
